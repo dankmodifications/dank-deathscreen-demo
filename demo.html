@@ -1,0 +1,787 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>dank-deathscreen — Live Demo</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.7.2/css/all.css">
+    <style>
+/* ── Demo wrapper ── */
+html, body {
+    margin: 0; padding: 0;
+    width: 100vw; height: 100vh;
+    overflow: hidden;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    color: #fff;
+    background: #0a0a0c;
+    user-select: none;
+}
+
+/* Simulated game world background */
+.demo-world {
+    position: fixed; inset: 0;
+    background: linear-gradient(135deg, #1a1e2e 0%, #0d1117 40%, #151a24 70%, #1a1e2e 100%);
+    z-index: 0;
+}
+.demo-world::after {
+    content: '';
+    position: absolute; inset: 0;
+    background:
+        radial-gradient(ellipse 120% 80% at 25% 75%, rgba(30,45,80,0.3), transparent 60%),
+        radial-gradient(ellipse 80% 60% at 75% 30%, rgba(20,35,60,0.2), transparent 50%);
+}
+
+/* Demo controls */
+.demo-controls {
+    position: fixed;
+    top: 24px; left: 50%;
+    transform: translateX(-50%);
+    z-index: 999;
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    transition: opacity 0.6s ease;
+}
+.demo-controls.faded { opacity: 0.15; }
+.demo-controls.faded:hover { opacity: 1; }
+
+.demo-btn {
+    padding: 10px 22px;
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 10px;
+    background: rgba(255,255,255,0.06);
+    color: #fff;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s, border-color 0.2s;
+}
+.demo-btn:hover { background: rgba(255,255,255,0.12); border-color: rgba(255,255,255,0.25); }
+.demo-btn.active { background: rgba(239,68,68,0.2); border-color: rgba(239,68,68,0.4); color: #f87171; }
+
+.demo-label {
+    font-size: 11px;
+    color: rgba(255,255,255,0.35);
+    letter-spacing: 0.5px;
+}
+
+.speed-select {
+    padding: 8px 12px;
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 8px;
+    background: rgba(255,255,255,0.06);
+    color: #fff;
+    font-family: inherit;
+    font-size: 12px;
+    cursor: pointer;
+    outline: none;
+}
+.speed-select option { background: #1a1e2e; color: #fff; }
+
+/* Branding */
+.demo-brand {
+    position: fixed;
+    bottom: 16px; left: 50%;
+    transform: translateX(-50%);
+    z-index: 999;
+    text-align: center;
+}
+.demo-brand-name {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    color: rgba(255,255,255,0.2);
+    text-transform: uppercase;
+}
+.demo-brand-sub {
+    font-size: 9px;
+    color: rgba(255,255,255,0.1);
+    margin-top: 2px;
+}
+
+/* ── Death Screen NUI ── */
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+#death-screen {
+    position: fixed; inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    transition: opacity 0.5s ease;
+}
+#death-screen.hidden { display: none; }
+
+.eye-overlay {
+    position: fixed; inset: 0;
+    width: 100vw; height: 100vh;
+    background: linear-gradient(170deg,
+        rgb(55, 18, 12) 0%, rgb(38, 11, 8) 30%,
+        rgb(45, 14, 10) 55%, rgb(32, 9, 6) 100%);
+    pointer-events: none;
+    z-index: 2;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    -webkit-mask-image: radial-gradient(ellipse 60vw 48vh at 50% 50%,
+        transparent 0%, transparent 90%, black 100%);
+    mask-image: radial-gradient(ellipse 60vw 48vh at 50% 50%,
+        transparent 0%, transparent 90%, black 100%);
+}
+
+.closed-eyes {
+    position: fixed; inset: 0;
+    width: 100vw; height: 100vh;
+    pointer-events: none; z-index: 3;
+    opacity: 0; transition: opacity 1.2s ease;
+}
+.closed-eyes.active { opacity: 1; }
+
+.closed-eyes-blob {
+    position: absolute; border-radius: 50%;
+    filter: blur(80px); opacity: 0.65;
+    animation: blobDrift 8s ease-in-out infinite alternate;
+}
+.blob-1 { width:500px;height:250px; background:radial-gradient(ellipse,rgba(160,45,20,0.45),transparent 70%); top:30%;left:20%; animation-delay:0s; }
+.blob-2 { width:400px;height:200px; background:radial-gradient(ellipse,rgba(190,90,30,0.35),transparent 70%); top:38%;left:50%; animation-delay:-3s; }
+.blob-3 { width:350px;height:180px; background:radial-gradient(ellipse,rgba(140,35,20,0.3),transparent 70%); top:48%;left:35%; animation-delay:-5s; }
+.blob-4 { width:280px;height:130px; background:radial-gradient(ellipse,rgba(210,100,40,0.25),transparent 70%); top:25%;left:65%; animation-delay:-2s; }
+.blob-5 { width:200px;height:100px; background:radial-gradient(ellipse,rgba(255,170,70,0.18),transparent 60%); top:56%;left:12%; animation-delay:-7s; animation-duration:6s; }
+
+@keyframes blobDrift {
+    0%   { transform: translate(0, 0) scale(1); }
+    50%  { transform: translate(20px, -10px) scale(1.08); }
+    100% { transform: translate(-15px, 8px) scale(0.95); }
+}
+
+.vignette {
+    position: fixed; inset: 0;
+    width: 100vw; height: 100vh;
+    pointer-events: none; z-index: 4;
+    opacity: 0; transition: opacity 0.6s ease;
+    background: radial-gradient(ellipse 55% 55% at 50% 50%,
+        transparent 0%, rgba(0,0,0,0.25) 70%, rgba(0,0,0,0.5) 100%);
+}
+.vignette.active { opacity: 1; }
+
+.death-panel {
+    position: fixed; bottom: 32px; left: 50%;
+    z-index: 100; pointer-events: auto;
+    opacity: 0; transition: opacity 0.4s ease, transform 0.4s ease;
+    transform: translateX(-50%) translateY(20px);
+}
+.death-panel.visible { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+.panel-content {
+    background: rgba(10, 10, 12, 0.92);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 16px;
+    padding: 18px 24px 16px;
+    min-width: 420px; max-width: 520px;
+    overflow: hidden;
+}
+
+.death-header { display:flex; align-items:center; gap:14px; margin-bottom:10px; }
+
+.death-icon-wrap { position:relative; width:42px;height:42px; flex-shrink:0; }
+.death-icon-inner {
+    position:absolute; inset:0;
+    display:flex; align-items:center; justify-content:center;
+    font-size:16px; color:#ef4444; z-index:2;
+}
+
+.progress-ring { position:absolute; inset:0; width:100%;height:100%; transform:rotate(-90deg); z-index:1; }
+.progress-ring-bg { fill:none; stroke:rgba(255,255,255,0.06); stroke-width:2; }
+.progress-ring-value {
+    fill:none; stroke:#ef4444; stroke-width:2.5;
+    stroke-linecap:round; stroke-dasharray:119.381;
+    stroke-dashoffset:0; transition: stroke-dashoffset 1s linear, stroke 0.6s ease;
+}
+
+.death-info { flex:1; min-width:0; }
+.death-title { font-size:15px; font-weight:700; letter-spacing:1.8px; text-transform:uppercase; color:#ef4444; line-height:1.2; }
+.death-subtitle { font-size:11px; font-weight:400; color:rgba(255,255,255,0.35); margin-top:2px; }
+
+.ems-counter {
+    display:flex; align-items:center; gap:6px;
+    background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.06);
+    border-radius:8px; padding:6px 10px;
+    font-size:12px; font-weight:600; color:rgba(255,255,255,0.5); flex-shrink:0;
+    transition: border-color 0.4s ease, color 0.4s ease;
+}
+.ems-counter.online { border-color:rgba(34,197,94,0.25); color:rgba(34,197,94,0.85); }
+.ems-dot { width:6px;height:6px; border-radius:50%; background:#ef4444; transition: background 0.4s,box-shadow 0.4s; }
+.ems-counter.online .ems-dot { background:#22c55e; box-shadow:0 0 6px rgba(34,197,94,0.5); }
+.ems-text { font-size:11px; letter-spacing:0.5px; }
+.ems-divider { width:1px;height:14px; background:rgba(255,255,255,0.1); }
+.ems-num { font-weight:700; font-size:13px; }
+.ems-counter.online .ems-num { color:#22c55e; }
+.ems-counter .fa-kit-medical { font-size:11px; }
+
+.death-timer { display:flex; align-items:center; gap:10px; margin-bottom:12px; }
+.ekg-container {
+    flex:1; height:40px; border-radius:8px; overflow:hidden;
+    background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.04);
+}
+.ekg-canvas { width:100%; height:100%; display:block; }
+
+.timer-text {
+    font-size:22px; font-weight:700; font-variant-numeric:tabular-nums;
+    color:rgba(255,255,255,0.85); min-width:52px; text-align:right;
+}
+.timer-text.critical { color:#ef4444; }
+
+.death-actions { display:flex; gap:8px; margin-bottom:0; }
+.action-btn {
+    flex:1; display:flex; align-items:center; gap:8px;
+    padding:8px 12px; background:rgba(255,255,255,0.04);
+    border:1px solid rgba(255,255,255,0.06); border-radius:8px;
+    cursor:default; transition: opacity 0.3s,background 0.3s,border-color 0.3s;
+}
+.action-btn.disabled { opacity:0.35; pointer-events:none; }
+.action-btn.done { opacity:0.5; border-color:rgba(34,197,94,0.3); }
+.action-btn.done .action-label { color:rgba(34,197,94,0.7); }
+
+.action-btn.pressed {
+    background:rgba(34,197,94,0.12); border-color:rgba(34,197,94,0.45);
+    animation: keyFlash 0.6s ease forwards;
+}
+.action-btn.pressed .action-key { background:rgba(34,197,94,0.25); border-color:rgba(34,197,94,0.5); color:#22c55e; }
+.action-btn.pressed .action-label { color:rgba(34,197,94,0.85); }
+@keyframes keyFlash { 0%{box-shadow:0 0 8px rgba(34,197,94,0.4);} 100%{box-shadow:0 0 0 rgba(34,197,94,0);} }
+
+.action-key {
+    display:flex; align-items:center; justify-content:center;
+    width:24px;height:24px; border-radius:5px;
+    background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.12);
+    font-size:11px; font-weight:700; color:rgba(255,255,255,0.6); flex-shrink:0;
+}
+.action-label { font-size:11px; font-weight:500; color:rgba(255,255,255,0.5); white-space:nowrap; }
+
+.action-btn.accent { border-color:rgba(59,130,246,0.15); }
+.action-btn.accent .action-key { background:rgba(59,130,246,0.12); border-color:rgba(59,130,246,0.25); color:#60a5fa; }
+.action-btn.danger { border-color:rgba(239,68,68,0.12); }
+.action-btn.danger .action-key { background:rgba(239,68,68,0.12); border-color:rgba(239,68,68,0.2); color:#f87171; }
+.action-btn.danger .action-label { color:rgba(239,68,68,0.5); }
+
+.healing-status {
+    display:none; align-items:center; gap:10px; margin-top:10px;
+    padding:10px 14px; background:rgba(34,197,94,0.06);
+    border:1px solid rgba(34,197,94,0.15); border-radius:10px;
+    animation: healPulse 2s ease-in-out infinite;
+}
+.healing-status.active { display:flex; }
+@keyframes healPulse { 0%,100%{border-color:rgba(34,197,94,0.15);} 50%{border-color:rgba(34,197,94,0.35);} }
+.healing-icon { font-size:14px; color:#22c55e; animation:iconSpin 3s linear infinite; }
+@keyframes iconSpin { 0%{transform:rotate(0deg);} 100%{transform:rotate(360deg);} }
+.healing-text { flex:1; font-size:12px; font-weight:500; color:rgba(34,197,94,0.85); }
+.healing-timer { font-size:14px; font-weight:700; font-variant-numeric:tabular-nums; color:#22c55e; }
+
+/* Death type subtitle colours */
+.death-subtitle.violent   { color: rgba(239,68,68,0.45); }
+.death-subtitle.natural   { color: rgba(255,255,255,0.35); }
+.death-subtitle.shooting  { color: rgba(239,68,68,0.5); }
+.death-subtitle.stabbing  { color: rgba(185,28,28,0.5); }
+.death-subtitle.melee     { color: rgba(234,88,12,0.45); }
+.death-subtitle.taser     { color: rgba(59,130,246,0.5); }
+.death-subtitle.fire      { color: rgba(245,158,11,0.5); }
+.death-subtitle.explosion { color: rgba(249,115,22,0.5); }
+.death-subtitle.vehicle   { color: rgba(251,191,36,0.4); }
+.death-subtitle.drown     { color: rgba(56,189,248,0.45); }
+.death-subtitle.fall      { color: rgba(163,163,163,0.4); }
+.death-subtitle.bleeding  { color: rgba(153,27,27,0.5); }
+.death-subtitle.animal    { color: rgba(180,83,9,0.45); }
+
+@media (max-width: 560px) {
+    .panel-content { min-width:340px; padding:14px 16px 12px; }
+    .death-actions { flex-direction:column; }
+}
+    </style>
+</head>
+<body>
+    <!-- Simulated game world -->
+    <div class="demo-world"></div>
+
+    <!-- Demo Controls -->
+    <div class="demo-controls" id="demo-controls">
+        <button class="demo-btn" id="btn-start">Start Demo</button>
+        <button class="demo-btn" id="btn-stop" style="display:none">Stop</button>
+        <div style="display:flex;flex-direction:column;gap:2px;">
+            <span class="demo-label">SPEED</span>
+            <select class="speed-select" id="speed-select">
+                <option value="1">1× (Real-time)</option>
+                <option value="5">5× Fast</option>
+                <option value="15" selected>15× Preview</option>
+                <option value="30">30× Quick</option>
+                <option value="60">60× Instant</option>
+            </select>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:2px;">
+            <span class="demo-label">DEATH TYPE</span>
+            <select class="speed-select" id="type-select">
+                <option value="random">Random</option>
+                <option value="shooting">Gunshot</option>
+                <option value="stabbing">Stabbing</option>
+                <option value="vehicle">Vehicle</option>
+                <option value="explosion">Explosion</option>
+                <option value="fall">Fall</option>
+                <option value="drown">Drowning</option>
+                <option value="fire">Fire</option>
+                <option value="melee">Melee</option>
+                <option value="bleeding">Bleeding</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- Death Screen (same structure as NUI) -->
+    <div id="death-screen" class="hidden">
+        <div class="eye-overlay" id="eye-overlay"></div>
+        <div class="closed-eyes" id="closed-eyes">
+            <div class="closed-eyes-blob blob-1"></div>
+            <div class="closed-eyes-blob blob-2"></div>
+            <div class="closed-eyes-blob blob-3"></div>
+            <div class="closed-eyes-blob blob-4"></div>
+            <div class="closed-eyes-blob blob-5"></div>
+        </div>
+        <div class="vignette" id="vignette"></div>
+        <div class="death-panel" id="death-panel">
+            <div class="panel-content">
+                <div class="death-header">
+                    <div class="death-icon-wrap" id="death-icon-wrap">
+                        <svg class="progress-ring" viewBox="0 0 42 42">
+                            <circle class="progress-ring-bg" cx="21" cy="21" r="19" />
+                            <circle class="progress-ring-value" id="progress-ring" cx="21" cy="21" r="19" />
+                        </svg>
+                        <div class="death-icon-inner" id="death-icon-inner">
+                            <i class="fas fa-skull"></i>
+                        </div>
+                    </div>
+                    <div class="death-info">
+                        <div class="death-title" id="death-title">FLATLINED</div>
+                        <div class="death-subtitle" id="death-subtitle">The streets don't forgive</div>
+                    </div>
+                    <div class="ems-counter online" id="ems-counter">
+                        <span class="ems-dot"></span>
+                        <i class="fas fa-kit-medical"></i>
+                        <span class="ems-text">EMS</span>
+                        <span class="ems-divider"></span>
+                        <span class="ems-num" id="ems-count">2</span>
+                    </div>
+                </div>
+                <div class="death-timer">
+                    <div class="ekg-container">
+                        <canvas class="ekg-canvas" id="ekg-canvas" width="600" height="40"></canvas>
+                    </div>
+                    <div class="timer-text" id="timer-text">300s</div>
+                </div>
+                <div class="death-actions">
+                    <div class="action-btn" id="action-ems">
+                        <span class="action-key">G</span>
+                        <span class="action-label">Request Help</span>
+                    </div>
+                    <div class="action-btn accent" id="action-aidoc">
+                        <span class="action-key">H</span>
+                        <span class="action-label">AI Doctor · $2,500</span>
+                    </div>
+                    <div class="action-btn danger disabled" id="action-respawn">
+                        <span class="action-key">E</span>
+                        <span class="action-label">Give Up · $1,500</span>
+                    </div>
+                </div>
+                <div class="healing-status" id="healing-status">
+                    <i class="fas fa-kit-medical healing-icon"></i>
+                    <span class="healing-text" id="healing-text">Being treated...</span>
+                    <span class="healing-timer" id="healing-timer">20s</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Branding -->
+    <div class="demo-brand">
+        <div class="demo-brand-name">dank-deathscreen</div>
+        <div class="demo-brand-sub">FiveM Death Screen NUI &mdash; Live Preview</div>
+    </div>
+
+    <script>
+(() => {
+    'use strict';
+
+    /* ========== DOM ========== */
+    const screen          = document.getElementById('death-screen');
+    const eyeOverlay      = document.getElementById('eye-overlay');
+    const closedEyes      = document.getElementById('closed-eyes');
+    const vignette        = document.getElementById('vignette');
+    const deathPanel      = document.getElementById('death-panel');
+    const deathTitle      = document.getElementById('death-title');
+    const deathSubtitle   = document.getElementById('death-subtitle');
+    const deathIconInner  = document.getElementById('death-icon-inner');
+    const progressRing    = document.getElementById('progress-ring');
+    const timerText       = document.getElementById('timer-text');
+    const actionEms       = document.getElementById('action-ems');
+    const actionRespawn   = document.getElementById('action-respawn');
+    const ekgCanvas       = document.getElementById('ekg-canvas');
+    const ekgCtx          = ekgCanvas.getContext('2d');
+    const controls        = document.getElementById('demo-controls');
+
+    /* ========== STATE ========== */
+    let isVisible    = false;
+    let intensity    = 1.0;
+    let eyeOpenness  = 1.0;
+    let ekgAnimId    = null;
+    let demoInterval = null;
+    let demoTime     = 300;
+    const MAX_TIME   = 300;
+    const PROGRESS_CIRCUMFERENCE = 2 * Math.PI * 19;
+
+    /* ========== EKG ENGINE ========== */
+    const EKG = (() => {
+        const BUF_LEN = 600;
+        const buffer  = new Float32Array(BUF_LEN);
+        let writeHead = 0, phase = 0, bpm = 72, targetBpm = 72, prevT = 0;
+        let onBeatCb  = null;
+        const SAMPLE_RATE = 60, R_PEAK_T = 0.22;
+
+        function pqrst(t) {
+            if (t < 0.12) return 0.12 * Math.sin(Math.PI * t / 0.12);
+            if (t < 0.18) return 0;
+            if (t < 0.22) return -0.08 * Math.sin(Math.PI * (t - 0.18) / 0.04);
+            if (t < 0.30) { const rt = (t - 0.22) / 0.08; return Math.sin(Math.PI * rt); }
+            if (t < 0.36) return -0.15 * Math.sin(Math.PI * (t - 0.30) / 0.06);
+            if (t < 0.50) return 0;
+            if (t < 0.66) return 0.22 * Math.sin(Math.PI * (t - 0.50) / 0.16);
+            return 0;
+        }
+
+        function tick() {
+            bpm += (targetBpm - bpm) * 0.05;
+            if (bpm < 2) { buffer[writeHead] = 0; writeHead = (writeHead + 1) % BUF_LEN; prevT = 0; return; }
+            const cycleLen = SAMPLE_RATE * (60 / bpm);
+            phase = (phase + 1) % cycleLen;
+            const t = phase / cycleLen;
+            if (prevT < R_PEAK_T && t >= R_PEAK_T && onBeatCb) onBeatCb();
+            prevT = t;
+            buffer[writeHead] = pqrst(t);
+            writeHead = (writeHead + 1) % BUF_LEN;
+        }
+
+        function render() {
+            const W = ekgCanvas.width, H = ekgCanvas.height;
+            ekgCtx.clearRect(0, 0, W, H);
+            const midY = H / 2, ampY = H * 0.38, gapPx = 10;
+            const headX = (writeHead / BUF_LEN) * W;
+            ekgCtx.lineWidth = 1.6; ekgCtx.lineJoin = 'round';
+            ekgCtx.strokeStyle = '#22c55e'; ekgCtx.shadowColor = '#22c55e'; ekgCtx.shadowBlur = 4;
+            ekgCtx.beginPath();
+            let started = false;
+            for (let i = 0; i < BUF_LEN; i++) {
+                const idx = (writeHead + i) % BUF_LEN;
+                const x = (i / BUF_LEN) * W;
+                const y = midY - buffer[idx] * ampY;
+                const dist = x - headX;
+                if (dist > 0 && dist < gapPx) { started = false; continue; }
+                if (!started) { ekgCtx.moveTo(x, y); started = true; }
+                else { ekgCtx.lineTo(x, y); }
+            }
+            ekgCtx.stroke(); ekgCtx.shadowBlur = 0;
+        }
+
+        return {
+            tick, render,
+            setBpm(v) { targetBpm = Math.max(0, v); },
+            setOnBeat(cb) { onBeatCb = cb; }
+        };
+    })();
+
+    /* ========== HEARTBEAT AUDIO ========== */
+    const Heartbeat = (() => {
+        let ctx, active = false, volume = 0.35, pitchMult = 1.0;
+        let masterInput, lowpass, masterGain, tinnitusOsc, tinnitusGain;
+
+        function init() {
+            try {
+                ctx = new (window.AudioContext || window.webkitAudioContext)();
+                masterInput = ctx.createGain(); masterInput.gain.value = 1.0;
+                lowpass = ctx.createBiquadFilter(); lowpass.type = 'lowpass'; lowpass.frequency.value = 22050; lowpass.Q.value = 0.7;
+                masterGain = ctx.createGain(); masterGain.gain.value = volume;
+                masterInput.connect(lowpass); lowpass.connect(masterGain); masterGain.connect(ctx.destination);
+                tinnitusOsc = ctx.createOscillator(); tinnitusGain = ctx.createGain();
+                tinnitusOsc.type = 'sine'; tinnitusOsc.frequency.value = 600;
+                tinnitusGain.gain.value = 0;
+                tinnitusOsc.connect(tinnitusGain); tinnitusGain.connect(masterGain);
+                tinnitusOsc.start();
+                EKG.setOnBeat(() => triggerBeat());
+            } catch (_) {}
+        }
+
+        function resume() { if (ctx && ctx.state === 'suspended') ctx.resume(); }
+
+        function _thud(time, freq, dur, relVol) {
+            if (!ctx || !masterInput) return;
+            const f = freq * pitchMult;
+            const osc = ctx.createOscillator(), gain = ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(f, time);
+            osc.frequency.exponentialRampToValueAtTime(f * 0.4, time + dur);
+            gain.gain.setValueAtTime(0.001, time);
+            gain.gain.linearRampToValueAtTime(relVol, time + 0.008);
+            gain.gain.exponentialRampToValueAtTime(0.001, time + dur);
+            osc.connect(gain); gain.connect(masterInput);
+            osc.start(time); osc.stop(time + dur + 0.02);
+        }
+
+        function triggerBeat() {
+            if (!ctx || !active) return;
+            resume();
+            const t = ctx.currentTime;
+            _thud(t, 50, 0.11, 1.0);
+            _thud(t + 0.13, 65, 0.08, 0.6);
+        }
+
+        function setDistortion(level) {
+            if (!ctx) return;
+            level = Math.max(0, Math.min(1, level));
+            const eased = level * level;
+            if (lowpass) lowpass.frequency.value = 22050 * Math.pow(800 / 22050, eased);
+            pitchMult = 1.0 - eased * 0.15;
+            if (masterInput) masterInput.gain.value = 1.0 - eased * 0.3;
+            if (tinnitusGain) {
+                const tinLevel = Math.max(0, (level - 0.6) / 0.4);
+                tinnitusGain.gain.value = tinLevel * tinLevel * 0.012;
+            }
+        }
+
+        return {
+            init,
+            start() { active = true; resume(); },
+            stop()  { active = false; },
+            setVolume(v) { volume = Math.max(0,Math.min(1,v)); if (masterGain) masterGain.gain.value = volume; },
+            setDistortion
+        };
+    })();
+
+    /* ========== EYE MASK ========== */
+    function updateEyeMask(openness) {
+        eyeOpenness = openness;
+        if (openness >= 1.0) { eyeOverlay.style.opacity = '0'; closedEyes.classList.remove('active'); return; }
+        const opacity = Math.pow(1.0 - openness, 0.5);
+        eyeOverlay.style.opacity = opacity.toFixed(3);
+        const rx = 58, ry = Math.max(0, openness * 46), feather = 10;
+        const mask = `radial-gradient(ellipse ${rx}vw ${ry}vh at 50% 50%, transparent 0%, transparent ${100 - feather}%, black 100%)`;
+        eyeOverlay.style.webkitMaskImage = mask;
+        eyeOverlay.style.maskImage = mask;
+        if (openness < 0.08) closedEyes.classList.add('active');
+        else closedEyes.classList.remove('active');
+    }
+
+    /* ========== PROGRESS RING ========== */
+    function updateProgressRing(pct) {
+        const offset = PROGRESS_CIRCUMFERENCE * (1 - pct / 100);
+        progressRing.style.strokeDashoffset = offset;
+        progressRing.style.stroke = pct < 25 ? '#dc2626' : pct < 50 ? '#ef4444' : '#f87171';
+    }
+
+    /* ========== DEATH TYPES ========== */
+    const DEATH_COPY = {
+        shooting:  { title:'GUNSHOT WOUND',  sub:'Critical blood loss from gunfire',        icon:'fa-crosshairs' },
+        stabbing:  { title:'STABBED',        sub:'Blade wound \u2014 hemorrhaging badly',         icon:'fa-droplet' },
+        melee:     { title:'BEATEN DOWN',    sub:'Blunt force trauma to the body',          icon:'fa-hand-fist' },
+        taser:     { title:'INCAPACITATED',  sub:'Electrical discharge \u2014 cardiac distress',  icon:'fa-bolt' },
+        fire:      { title:'BURNED',         sub:'Severe burns \u2014 critical condition',        icon:'fa-fire' },
+        explosion: { title:'BLAST INJURY',   sub:'Explosive trauma \u2014 internal damage',       icon:'fa-explosion' },
+        vehicle:   { title:'COLLISION',      sub:'Vehicle impact \u2014 multiple fractures',      icon:'fa-car-burst' },
+        drown:     { title:'DROWNING',       sub:'Water fills your lungs',                  icon:'fa-water' },
+        fall:      { title:'FRACTURED',      sub:'Severe fall \u2014 broken bones',              icon:'fa-person-falling' },
+        violent:   { title:'FLATLINED',      sub:'Critical injuries sustained',             icon:'fa-skull-crossbones' },
+        bleeding:  { title:'BLEEDING OUT',   sub:'Severe hemorrhaging \u2014 fading fast',       icon:'fa-heart-pulse' },
+        unknown:   { title:'FLATLINED',      sub:'Hold on...',                              icon:'fa-skull' },
+    };
+    const DEATH_TYPES = ['shooting','stabbing','vehicle','explosion','fall','drown','fire','melee','bleeding'];
+
+    function applyDeathType(type) {
+        const copy = DEATH_COPY[type] || DEATH_COPY.unknown;
+        deathTitle.textContent = copy.title;
+        deathSubtitle.textContent = copy.sub;
+        deathSubtitle.className = 'death-subtitle ' + type;
+        deathIconInner.innerHTML = `<i class="fas ${copy.icon}"></i>`;
+    }
+
+    /* ========== FORMAT ========== */
+    function fmtTime(s) {
+        s = Math.max(0, Math.ceil(s));
+        if (s >= 60) { const m = Math.floor(s / 60); return `${m}:${(s % 60).toString().padStart(2, '0')}`; }
+        return `${s}s`;
+    }
+
+    /* ========== CONSCIOUSNESS PHASING ========== */
+    function updatePhaseEffect() {
+        if (intensity >= 0.6) return;
+        const fadeProgress = 1.0 - intensity;
+        const adjustedFade = Math.max(0, (fadeProgress - 0.4) / 0.6);
+        const freq = 0.08 + adjustedFade * 0.27;
+        const t = performance.now() / 1000;
+        const rawWave = (Math.sin(t * freq * Math.PI * 2) + 1) / 2;
+        const wave = rawWave * rawWave;
+        const baseVig = 0.35 + adjustedFade * 0.35;
+        const oscVig = wave * adjustedFade * 0.2;
+        vignette.style.opacity = (baseVig + oscVig).toFixed(3);
+    }
+
+    /* ========== INTENSITY MAPPING ========== */
+    function applyIntensity(pct) {
+        intensity = pct;
+        const bpm = Math.round(pct * 60);
+        EKG.setBpm(bpm);
+
+        let vol;
+        if (pct > 0.4) vol = 0.05 + (1 - pct) * 0.217;
+        else vol = 0.03 + pct * 0.375;
+        Heartbeat.setVolume(vol);
+
+        const distortion = Math.max(0, (1 - pct - 0.1) / 0.9);
+        Heartbeat.setDistortion(distortion);
+
+        const closeThreshold = 0.7;
+        if (pct >= closeThreshold) updateEyeMask(1.0);
+        else updateEyeMask(pct / closeThreshold);
+
+        if (pct < 0.95) vignette.classList.add('active');
+        else vignette.classList.remove('active');
+
+        if (pct < 0.2) timerText.classList.add('critical');
+        else timerText.classList.remove('critical');
+    }
+
+    /* ========== EKG LOOP ========== */
+    function startEkgLoop() {
+        if (ekgAnimId) return;
+        function frame() {
+            if (!isVisible) { ekgAnimId = null; return; }
+            EKG.tick(); EKG.render(); updatePhaseEffect();
+            ekgAnimId = requestAnimationFrame(frame);
+        }
+        ekgAnimId = requestAnimationFrame(frame);
+    }
+    function stopEkgLoop() { if (ekgAnimId) { cancelAnimationFrame(ekgAnimId); ekgAnimId = null; } }
+
+    /* ========== SHOW / HIDE ========== */
+    function show(deathType) {
+        isVisible = true;
+        applyDeathType(deathType);
+        actionEms.classList.remove('disabled', 'done');
+        actionRespawn.classList.add('disabled');
+        applyIntensity(1.0);
+        updateProgressRing(100);
+        screen.classList.remove('hidden');
+        deathPanel.classList.add('visible');
+        vignette.classList.add('active');
+        Heartbeat.init();
+        Heartbeat.start();
+        startEkgLoop();
+        controls.classList.add('faded');
+    }
+
+    function hide() {
+        isVisible = false;
+        screen.classList.add('hidden');
+        deathPanel.classList.remove('visible');
+        closedEyes.classList.remove('active');
+        vignette.classList.remove('active');
+        eyeOverlay.style.opacity = '0';
+        eyeOverlay.style.webkitMaskImage = '';
+        eyeOverlay.style.maskImage = '';
+        vignette.style.opacity = '';
+        Heartbeat.setDistortion(0);
+        Heartbeat.stop();
+        stopEkgLoop();
+        controls.classList.remove('faded');
+    }
+
+    /* ========== DEMO SIMULATION ========== */
+    const btnStart = document.getElementById('btn-start');
+    const btnStop  = document.getElementById('btn-stop');
+    const speedSel = document.getElementById('speed-select');
+    const typeSel  = document.getElementById('type-select');
+
+    function getDeathType() {
+        const v = typeSel.value;
+        if (v === 'random') return DEATH_TYPES[Math.floor(Math.random() * DEATH_TYPES.length)];
+        return v;
+    }
+
+    function startDemo() {
+        if (demoInterval) return;
+        demoTime = MAX_TIME;
+        show(getDeathType());
+        btnStart.style.display = 'none';
+        btnStop.style.display = '';
+
+        // Simulate key press at random intervals
+        const keyFlashInterval = setInterval(() => {
+            if (!isVisible) { clearInterval(keyFlashInterval); return; }
+            const btns = [actionEms];
+            const btn = btns[Math.floor(Math.random() * btns.length)];
+            btn.classList.add('pressed');
+            setTimeout(() => btn.classList.remove('pressed'), 600);
+        }, 8000);
+
+        // Simulate EMS requested after 5 real seconds
+        setTimeout(() => {
+            if (isVisible) {
+                actionEms.classList.add('done');
+                actionEms.querySelector('.action-label').textContent = 'Help Requested';
+                actionEms.classList.add('pressed');
+                setTimeout(() => actionEms.classList.remove('pressed'), 600);
+            }
+        }, 5000);
+
+        demoInterval = setInterval(() => {
+            const speed = parseInt(speedSel.value) || 15;
+            demoTime -= speed;
+            if (demoTime <= 0) {
+                demoTime = 0;
+                actionRespawn.classList.remove('disabled');
+            }
+            const pct = Math.max(0, demoTime / MAX_TIME);
+            applyIntensity(pct);
+            updateProgressRing(pct * 100);
+            timerText.textContent = fmtTime(demoTime);
+
+            if (demoTime <= 0) {
+                // Hold at flatline for 4 seconds then reset
+                setTimeout(() => {
+                    stopDemo();
+                }, 4000);
+                clearInterval(demoInterval);
+                demoInterval = null;
+            }
+        }, 1000);
+    }
+
+    function stopDemo() {
+        if (demoInterval) { clearInterval(demoInterval); demoInterval = null; }
+        hide();
+        btnStart.style.display = '';
+        btnStop.style.display = 'none';
+    }
+
+    btnStart.addEventListener('click', startDemo);
+    btnStop.addEventListener('click', stopDemo);
+
+    // Keyboard shortcut: Space to start/stop
+    document.addEventListener('keydown', (e) => {
+        if (e.code === 'Space' && !e.repeat) {
+            e.preventDefault();
+            if (isVisible) stopDemo();
+            else startDemo();
+        }
+    });
+
+    /* ========== INIT ========== */
+    Heartbeat.init();
+    progressRing.style.strokeDasharray = PROGRESS_CIRCUMFERENCE;
+})();
+    </script>
+</body>
+</html>
